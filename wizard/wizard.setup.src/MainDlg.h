@@ -13,7 +13,6 @@ class CMainDlg : public CDialogImpl<CMainDlg>
 		CString strDataTarget;
 		CString strEntrySrc;
 		CString strEntryTarget;
-		CString strScriptSrc;
 	};
 public:
 	enum { IDD = IDD_MAINDLG };
@@ -53,38 +52,27 @@ public:
 		}
 		return bIsWow64;
 	}
-
-	CString GetVSDir(LPCTSTR pszEnvName)
+	
+	CString GetVSDir(LPCTSTR keyPath,LPCTSTR keyname)
 	{
-		if (_tcscmp(_T("VS141COMNTOOLS"), pszEnvName) == 0)
-			return GetVS2017Dir(pszEnvName);
-
-		CString strRet;
-		strRet.GetEnvironmentVariable(pszEnvName);
-		if(!strRet.IsEmpty()) strRet=strRet.Left(strRet.GetLength()-14);//14=length("Common7\Tools\")
-		return strRet;
-	}
-
-	CString GetVS2017Dir(LPCTSTR pszEnvName)
-	{
-		const WCHAR *wowkey[2] = {LR"(SOFTWARE\WOW6432Node\Microsoft\VisualStudio\SxS\VS7)",
-			LR"(SOFTWARE\Microsoft\VisualStudio\SxS\VS7)"};
+		const WCHAR *wowkey[2] = {LR"(SOFTWARE\WOW6432Node\%s)",
+			LR"(SOFTWARE\%s)"};
 
 		CString strRet;
 		HKEY hKey;
+		CString keypath;
+		keypath.Format(IsWow64() ? wowkey[0] : wowkey[1], keyPath);
+		
 		LSTATUS ec = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-								  IsWow64() ? wowkey[0] : wowkey[1],
-								  0,
-								  KEY_READ, &hKey);
+			keypath,0, KEY_READ, &hKey);
 		if (ec == ERROR_SUCCESS)
 		{
 			DWORD dwType = REG_SZ;
 			DWORD dwSize = MAX_PATH;
 			wchar_t data[MAX_PATH] = { 0 };
-			if (ERROR_SUCCESS == RegQueryValueEx(hKey, L"15.0", 0, &dwType, (LPBYTE)data, &dwSize))
+			if (ERROR_SUCCESS == RegQueryValueEx(hKey, keyname, 0, &dwType, (LPBYTE)data, &dwSize))
 			{
 				strRet = data;
-				strRet += LR"(Common7\IDE\)";
 			}
 			RegCloseKey(hKey);
 		}
@@ -134,23 +122,29 @@ public:
 
 			VSENVCFG *pEnvCfg=new VSENVCFG;
 			pEnvCfg->strName=szBuf;
-			GetPrivateProfileString(entry,_T("envname"),NULL,szBuf,1000,szVsList);
-			pEnvCfg->strVsDir=GetVSDir(szBuf);
+			CString keypath;//, keyname
+			GetPrivateProfileString(entry,_T("keypath"),NULL,szBuf,1000,szVsList);
+			keypath = szBuf;
+			GetPrivateProfileString(entry, _T("keyname"), NULL, szBuf, 1000, szVsList);			
+			pEnvCfg->strVsDir=GetVSDir(keypath, szBuf);
 			if(pEnvCfg->strVsDir.IsEmpty())
 			{
 				delete pEnvCfg;
 				continue;
-			}
+			}			
 			GetPrivateProfileString(entry,_T("entryfilesrc"),NULL,szBuf,1000,szVsList);
+			
 			pEnvCfg->strEntrySrc=szBuf;
 			GetPrivateProfileString(entry,_T("entryfiletarget"),NULL,szBuf,1000,szVsList);
+			if (GetFileAttributes(pEnvCfg->strVsDir + szBuf) == INVALID_FILE_ATTRIBUTES)
+			{
+				delete pEnvCfg;
+				continue;
+			}
 			pEnvCfg->strEntryTarget=szBuf;
 			GetPrivateProfileString(entry,_T("wizarddatatarget"),NULL,szBuf,1000,szVsList);
 			pEnvCfg->strDataTarget=szBuf;
 			
-			GetPrivateProfileString(entry,_T("scriptsrc"),NULL,szBuf,1000,szVsList);
-			pEnvCfg->strScriptSrc=szBuf;
-
 			int iItem=vslist.InsertItem(vslist.GetItemCount(),pEnvCfg->strName);
 			vslist.SetItemData(iItem,(DWORD_PTR)pEnvCfg);
 		}
