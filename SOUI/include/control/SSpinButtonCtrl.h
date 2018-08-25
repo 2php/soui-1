@@ -3,13 +3,16 @@
 
 namespace SOUI
 {
-    class SSpinButtonCtrl : public SWindow
+    class SOUI_EXP SSpinButtonCtrl : public SWindow
     {
     SOUI_CLASS_NAME(SSpinButtonCtrl,L"spinButton")
     public:
         SSpinButtonCtrl(void);
         ~SSpinButtonCtrl(void);
         
+		void SetValue(int nValue);
+		void SetRange(int nMin, int nMax);
+		void SetStep(UINT nStep);
     protected:
         virtual CSize GetDesiredSize(LPCRECT pRcContainer);
         virtual void UpdateChildrenPosition();
